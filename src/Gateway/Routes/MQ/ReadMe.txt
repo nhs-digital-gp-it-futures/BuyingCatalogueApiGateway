@@ -1,0 +1,1 @@
+﻿Add AMQP service routes in this folder and ensure they're set to `Copy if Newer`
