@@ -1,0 +1,4 @@
+﻿endpoint: /sports
+destination:
+    messageQueue: "sports"
+        
