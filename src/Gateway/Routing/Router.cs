@@ -80,8 +80,6 @@ namespace Gateway.Routing
 
         internal async Task<ExtractedResponse> RouteRequest(ExtractedRequest request)
         {
-            Debug.WriteLine($"body is {request.Body}");
-
             CorrelationId = Guid.Parse(request.Headers["X-Correlation-Id"]);
 
             // Organise the path to the final endpoint
