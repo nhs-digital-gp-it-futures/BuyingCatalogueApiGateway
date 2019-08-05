@@ -6,8 +6,9 @@ using System.Threading.Tasks;
 
 namespace Gateway.Queueing
 {
-    interface IRabbitMQConnectionFactory
+    public interface IRabbitMQConnectionFactory
     {
         IConnection CreateConnection();
+        string GetExchangeName();
     }
 }

@@ -1,6 +1,7 @@
 ﻿using FluentAssertions;
 using Gateway.Queueing;
 using Gateway.Routing;
+using Microsoft.Extensions.Options;
 using Moq;
 using RabbitMQ.Client;
 using System;
@@ -16,12 +17,7 @@ namespace Gateway.Tests.UnitTests.Routing
         [Fact]
         public void Router_GetEndpoints_TypeMQ()
         {
-            var mockedModel = new Mock<IModel>();
-            mockedModel.Setup(s => s.QueueDeclare(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<IDictionary<string, object>>()));
-
-            var router = new Router();
-
-            var routes = router.GetRoutes(Path.Combine(Environment.CurrentDirectory, "Routes", "MQ"), TransportType.MessageQueue);
+            var routes = Router.GetRoutes(Path.Combine(Environment.CurrentDirectory, "Routes", "MQ"), TransportType.MessageQueue);
 
             routes.Should().AllBeOfType<Route>();
             foreach(var route in routes)
@@ -33,9 +29,7 @@ namespace Gateway.Tests.UnitTests.Routing
         [Fact]
         public void Router_GetEndpoints_TypeHttp()
         {
-            var router = new Router();
-
-            var routes = router.GetRoutes(Path.Combine(Environment.CurrentDirectory, "Routes", "Http"), TransportType.Http);
+            var routes = Router.GetRoutes(Path.Combine(Environment.CurrentDirectory, "Routes", "Http"), TransportType.Http);
 
             routes.Should().AllBeOfType<Route>();
             foreach (var route in routes)

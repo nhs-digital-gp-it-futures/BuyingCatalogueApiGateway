@@ -9,7 +9,7 @@ namespace Gateway.Routing
     {
         public string Body { get; }
         public string Query { get; }
-        public string Path { get; }
+        public string Path { get; set; }
         public IHeaderDictionary Headers { get; }
         public string Method { get; }
 
