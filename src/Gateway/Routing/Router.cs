@@ -2,6 +2,7 @@
 using Gateway.Queueing;
 using Gateway.Utils.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using RabbitMQ.Client;
 using RestSharp;
@@ -19,26 +20,26 @@ namespace Gateway.Routing
 {
     public sealed class Router
     {
-        internal List<Route> Endpoints { get; }
+        internal List<Route> Endpoints { get; }        
+        public IConfiguration Configuration { get; set; }
+                
+        private readonly IRabbitMQConnectionFactory connectionFactory;
+        private readonly IConnection Connection;
+        private readonly RabbitMQHelper rabbitMQHelper;
         private Guid CorrelationId;
-        private readonly IConfiguration configuration;
-        private readonly IDeserializer deserializer;
-        private readonly IModel channel;
 
-        public Router(IConfiguration config, IModel rabbitChannel)
+        public Router(IOptionsMonitor<RabbitMQConnectionDetails> connectionDetails)
         {
-            channel = rabbitChannel;
+            this.connectionFactory = new RabbitMQConnection(connectionDetails.CurrentValue);
 
-            deserializer = new DeserializerBuilder()
-                .WithNamingConvention(new CamelCaseNamingConvention())
-                .Build();
+            Connection = connectionFactory.CreateConnection();
 
-            configuration = config;
+            rabbitMQHelper = new RabbitMQHelper(Connection, this.connectionFactory.GetExchangeName());
 
             string mqRoutesPath = Path.Combine(Environment.CurrentDirectory, "Routes", "MQ");
             string httpRoutesPath = Path.Combine(Environment.CurrentDirectory, "Routes", "Http");
 
-            var mqRoutes = GetRoutes(mqRoutesPath, TransportType.MessageQueue);
+            var mqRoutes = GetRoutes(mqRoutesPath, TransportType.MessageQueue, rabbitMQHelper);
             var httpRoutes = GetRoutes(httpRoutesPath, TransportType.Http);
 
             // Sets the Endpoints list to the list containing MQRoutes and adds the HTTP routes to it
@@ -48,21 +49,98 @@ namespace Gateway.Routing
 
         public Router()
         {            
-            deserializer = new DeserializerBuilder()
-                .WithNamingConvention(new CamelCaseNamingConvention())
-                .Build();
         }
 
-        public List<Route> GetRoutes(string path, TransportType transportType)
+        internal async Task<ExtractedResponse> RouteRequest(ExtractedRequest request)
+        {
+            rabbitMQHelper.PushAuditMessage(request.GetJsonBytes());
+
+            CorrelationId = Guid.Parse(request.Headers["X-Correlation-Id"]);
+
+            // Organise the path to the final endpoint            
+            string basePath = '/' + request.Path.Split('/')[1];
+
+            ExtractedResponse response = new ExtractedResponse();
+
+            // Get the correct endpoint for the route requested
+            Route route = null;
+            try
+            {
+                route = Endpoints.First(r => r.Endpoint.Equals(basePath));
+            }
+            catch
+            {
+                response.Body = "Unable to locate path";
+                response.StatusCode = HttpStatusCode.NotFound;                
+            }            
+
+            if (route != null)
+            {
+                bool authorized = route.Destination.RequiresAuthentication ? /* Stuff should happen here to authorize peeps*/ false : true ;
+                if (route.Destination.RequiresAuthentication)
+                {
+                    // Put the auth stuff here
+                }
+                else
+                {
+                    authorized = true;
+                }
+
+                if (authorized)
+                {
+                    if (route.TransportType == TransportType.Http)
+                    {
+                        var apiUrl = Configuration.GetConnectionString(route.Destination.ApiName);
+
+                        // Does the converting for endpoint routing properly
+                        var endPath = request.Path.Split('/');
+                        endPath[1] = route.Destination.Uri;
+                        request.Path = string.Join('/', endPath);
+
+                        IRestRequest restRequest = HttpRequestMessageFactory.GenerateRequestMessage(request, apiUrl);
+
+                        response = await HttpClientWrapper.SendRequest(restRequest);
+                    }
+                    else if (route.TransportType == TransportType.MessageQueue)
+                    {
+                        
+
+                        response.Body = "";
+                        response.StatusCode = HttpStatusCode.OK;
+                    }
+                    else
+                    {
+                        response.Body = "Transport type not supported";
+                        response.StatusCode = HttpStatusCode.BadRequest;
+                    }
+                }
+            }
+            else
+            {
+                response.Body = "An error occurred";
+                response.StatusCode = HttpStatusCode.RequestTimeout;
+            }
+
+            response.Headers.Add("X-Correlation-Id", CorrelationId.ToString());            
+            rabbitMQHelper.PushAuditMessage(response.GetJsonBytes());
+
+            return response;
+        }
+
+        public static List<Route> GetRoutes(string path, TransportType transportType, RabbitMQHelper helper = null)
         {
             var routeFiles = GetFiles(path, "*.yml");
 
-            return ExtractRoutes(transportType, routeFiles, deserializer);
+            return ExtractRoutes(transportType, routeFiles, helper);
         }
 
-        private static List<Route> ExtractRoutes(TransportType transportType, FileInfo[] routeFiles, IDeserializer deserializer)
+        private static List<Route> ExtractRoutes(TransportType transportType, FileInfo[] routeFiles, RabbitMQHelper helper = null)
         {
             var routes = new List<Route>();
+
+            var deserializer = new DeserializerBuilder()
+                .WithNamingConvention(new CamelCaseNamingConvention())
+                .Build();
 
             foreach (var routeFile in routeFiles)
             {
@@ -72,66 +150,19 @@ namespace Gateway.Routing
                     var route = deserializer.Deserialize<Route>(routeInfo);
                     route.TransportType = transportType;
                     routes.Add(route);
+
+                    // Sets up Rabbit queue if it doesn't exist
+                    if(helper != null)
+                    {
+                        helper.SetupQueue(route.Destination.MessageQueue);
+                    }
                 }
             }
 
             return routes;
         }
 
-        internal async Task<ExtractedResponse> RouteRequest(ExtractedRequest request)
-        {
-            CorrelationId = Guid.Parse(request.Headers["X-Correlation-Id"]);
-
-            // Organise the path to the final endpoint
-            string path = request.Path.ToString();
-            string basePath = '/' + path.Split('/')[1];
-
-            // Get the correct endpoint for the route requested
-            Route route;
-            try
-            {
-                route = Endpoints.First(r => r.Endpoint.Equals(basePath));
-            }
-            catch
-            {
-                return new ExtractedResponse("Unable to locate path", HttpStatusCode.NotFound);
-            }
-
-            if (route.Destination.RequiresAuthentication)
-            {
-                // Here goes the Auth plugin!
-            }
-
-            if (route != null)
-            {
-                if (route.TransportType == TransportType.Http)
-                {
-                    var apiUrl = configuration.GetConnectionString(route.Destination.ApiName);
-
-                    IRestRequest restRequest = HttpRequestMessageFactory.GenerateRequestMessage(request, apiUrl);
-
-                    return await HttpClientWrapper.SendRequest(restRequest);
-                }
-                else if (route.TransportType == TransportType.MessageQueue)
-                {
-                    var response = await new SendMessage(channel).SendAndReceiveCall(JsonConvert.SerializeObject(request),route.Destination.MessageQueue, CorrelationId);
-
-                    return new ExtractedResponse(response, HttpStatusCode.OK);
-                }
-                else
-                {
-                    var content = "Transport type not supported";
-
-                    return new ExtractedResponse(content, HttpStatusCode.BadRequest);
-                }
-            }
-            else
-            {
-                return new ExtractedResponse("An error occurred", HttpStatusCode.RequestTimeout);
-            }
-        }
-
-        internal FileInfo[] GetFiles(string path, string extension)
+        internal static FileInfo[] GetFiles(string path, string extension)
         {
             DirectoryInfo directory = new DirectoryInfo(path);
             var routeFiles = directory.GetFiles(extension);

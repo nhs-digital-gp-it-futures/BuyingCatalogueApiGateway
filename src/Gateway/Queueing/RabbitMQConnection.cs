@@ -1,29 +1,29 @@
-﻿using Microsoft.Extensions.Options;
-using RabbitMQ.Client;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using RabbitMQ.Client;
 
 namespace Gateway.Queueing
 {
     public class RabbitMQConnection : IRabbitMQConnectionFactory
-    {
-        private readonly string connectionString;
-
-        public RabbitMQConnection(string connection)
+    {        
+        private readonly RabbitMQConnectionDetails connection;
+        
+        public RabbitMQConnection(RabbitMQConnectionDetails connection)
         {
-            this.connectionString = connection;
+            this.connection = connection;
         }
 
         public IConnection CreateConnection()
         {
             var factory = new ConnectionFactory
             {
-                HostName = connectionString
+                HostName = connection.HostName,                
             };
-            var connection = factory.CreateConnection();
-            return connection;
+            
+            return factory.CreateConnection(); ;
+        }
+
+        public string GetExchangeName()
+        {
+            return connection.ExchangeName;
         }
     }
 }

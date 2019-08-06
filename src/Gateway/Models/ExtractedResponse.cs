@@ -17,7 +17,7 @@ namespace Gateway.Models
     {
         public string Body { get; set; }
         public HttpStatusCode StatusCode { get; set; }
-        public IHeaderDictionary Headers { get; set; }
+        public IHeaderDictionary Headers { get; set; } = new HeaderDictionary();
 
         public ExtractedResponse(Microsoft.AspNetCore.Http.HttpResponse response)
         {            
@@ -26,7 +26,7 @@ namespace Gateway.Models
                 Body = reader.ReadToEnd();
             }
 
-            StatusCode = (HttpStatusCode)response.StatusCode;
+            StatusCode = (HttpStatusCode)response.StatusCode;            
         }
 
         public ExtractedResponse(IRestResponse response)
@@ -39,6 +39,10 @@ namespace Gateway.Models
         {
             Body = content;
             StatusCode = statusCode;
+        }
+
+        public ExtractedResponse()
+        {
         }
 
         public byte[] GetJsonBytes()

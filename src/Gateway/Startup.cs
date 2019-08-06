@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using RabbitMQ.Client;
 using System;
@@ -19,7 +20,7 @@ namespace Gateway
         public Startup(IHostingEnvironment env)
         {
             var builder = new ConfigurationBuilder()
-                .SetBasePath(env.ContentRootPath)
+                .SetBasePath(Directory.GetCurrentDirectory())
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                 .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true);
             builder.AddEnvironmentVariables();
@@ -32,40 +33,55 @@ namespace Gateway
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+
+            services.AddOptions();
+
+            var section = Configuration.GetSection("RabbitMQ");
+            services.Configure<RabbitMQConnectionDetails>(section);
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env, IOptionsMonitor<RabbitMQConnectionDetails> connDetails)
         {
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
             }
 
-            RabbitMQConnection connection = new RabbitMQConnection(Configuration.GetConnectionString("MQserver"));
-            IConnection channel = connection.CreateConnection();
-            IModel rabbitModel = channel.CreateModel();
-            RabbitMQHelper helper = new RabbitMQHelper(rabbitModel);
-
-            helper.SetupQueue("audit");
-
-            Router router = new Router(Configuration, rabbitModel);
-            app.Run(async (context) =>
+            Router router = new Router(connDetails)
             {
-                SendMessage sendMessage = new SendMessage(rabbitModel);
+                // Configuration included to help with HTTP API calls
+                Configuration = Configuration
+            };
+
+            app.Use(async (context, next) =>
+            {
                 var correlationId = Guid.NewGuid();
-                context.Request.Headers.Add("X-Correlation-Id", correlationId.ToString());
+                // Add a header to the request containing a correlation ID. If that header is already present, extract it for later use
+                if (context.Request.Headers.ContainsKey("X-Correlation-Id"))
+                {
+                    correlationId = Guid.Parse(context.Request.Headers["X-Correlation-Id"]);                    
+                }
+                else
+                {
+                    context.Request.Headers.Add("X-Correlation-Id", correlationId.ToString());
+                }
+
+                if (!context.Response.Headers.ContainsKey("X-Correlation-Id"))
+                {
+                    context.Response.Headers.Add("X-Correlation-Id", correlationId.ToString());
+                }
+                await next.Invoke();
+            });
+
+            app.Run(async (context) =>
+            {   
                 var extractedRequest = new ExtractedRequest(context.Request);
 
-                sendMessage.SendCall(JsonConvert.SerializeObject(extractedRequest), "audit", correlationId);
-
                 var content = await router.RouteRequest(extractedRequest);
-                context.Response.Headers.Add("X-Correlation-Id", correlationId.ToString());
                 context.Response.ContentType = "application/json";
-                context.Response.StatusCode = (int)Enum.Parse(typeof(HttpStatusCode), content.StatusCode.ToString());
-                content.Headers = context.Response.Headers;
-
-                sendMessage.SendCall(JsonConvert.SerializeObject(content), "audit", correlationId);
+                context.Response.StatusCode = (int)content.StatusCode;
+                content.Headers = context.Response.Headers;                
 
                 await context.Response.WriteAsync(content.Body);
             });
