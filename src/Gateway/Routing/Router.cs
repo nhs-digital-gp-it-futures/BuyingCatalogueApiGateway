@@ -1,20 +1,19 @@
 ﻿using Gateway.Models;
-using Gateway.Queueing;
 using Gateway.Utils.Http;
+using Gateway.MQ.Common;
+using Gateway.MQ.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
-using RabbitMQ.Client;
 using RestSharp;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
+using Gateway.MQ.Rabbit;
 
 namespace Gateway.Routing
 {
@@ -22,24 +21,18 @@ namespace Gateway.Routing
     {
         internal List<Route> Endpoints { get; }        
         public IConfiguration Configuration { get; set; }
-                
-        private readonly IRabbitMQConnectionFactory connectionFactory;
-        private readonly IConnection Connection;
-        private readonly RabbitMQHelper rabbitMQHelper;
+
+        private readonly IMessageClient messageClient;
         private Guid CorrelationId;
 
-        public Router(IOptionsMonitor<RabbitMQConnectionDetails> connectionDetails)
+        public Router(IMessageClient messageClient)
         {
-            this.connectionFactory = new RabbitMQConnection(connectionDetails.CurrentValue);
-
-            Connection = connectionFactory.CreateConnection();
-
-            rabbitMQHelper = new RabbitMQHelper(Connection, this.connectionFactory.GetExchangeName());
+            this.messageClient = messageClient;
 
             string mqRoutesPath = Path.Combine(Environment.CurrentDirectory, "Routes", "MQ");
             string httpRoutesPath = Path.Combine(Environment.CurrentDirectory, "Routes", "Http");
 
-            var mqRoutes = GetRoutes(mqRoutesPath, TransportType.MessageQueue, rabbitMQHelper);
+            var mqRoutes = GetRoutes(mqRoutesPath, TransportType.MessageQueue, messageClient);
             var httpRoutes = GetRoutes(httpRoutesPath, TransportType.Http);
 
             // Sets the Endpoints list to the list containing MQRoutes and adds the HTTP routes to it
@@ -47,13 +40,9 @@ namespace Gateway.Routing
             Endpoints.AddRange(httpRoutes);
         }
 
-        public Router()
-        {            
-        }
-
-        internal async Task<ExtractedResponse> RouteRequest(ExtractedRequest request)
+        public async Task<ExtractedResponse> RouteRequest(ExtractedRequest request)
         {
-            rabbitMQHelper.PushAuditMessage(request.GetJsonBytes());
+            messageClient.PushAuditMessage(request.GetJsonBytes());
 
             CorrelationId = Guid.Parse(request.Headers["X-Correlation-Id"]);
 
@@ -63,18 +52,23 @@ namespace Gateway.Routing
             ExtractedResponse response = new ExtractedResponse();
 
             // Get the correct endpoint for the route requested
-            Route route = null;
+            Route route;
+
             try
             {
-                route = Endpoints.First(r => r.Endpoint.Equals(basePath));
+                route = Endpoints.First(r => r.Endpoint.Equals(basePath)) ?? null;
             }
             catch
             {
+                route = null;
+            }
+
+            if(route == null)
+            {            
                 response.Body = "Unable to locate path";
                 response.StatusCode = HttpStatusCode.NotFound;                
-            }            
-
-            if (route != null)
+            }
+            else 
             {
                 bool authorized = route.Destination.RequiresAuthentication ? /* Stuff should happen here to authorize peeps*/ false : true ;
                 if (route.Destination.RequiresAuthentication)
@@ -103,9 +97,9 @@ namespace Gateway.Routing
                     }
                     else if (route.TransportType == TransportType.MessageQueue)
                     {
-                        
+                        messageClient.PushMessageIntoQueue(request.GetJsonBytes(), route.Destination.MessageQueue);
 
-                        response.Body = "";
+                        response.Body = "{message: \"Message client does not support responses at the moment\"}";
                         response.StatusCode = HttpStatusCode.OK;
                     }
                     else
@@ -115,26 +109,22 @@ namespace Gateway.Routing
                     }
                 }
             }
-            else
-            {
-                response.Body = "An error occurred";
-                response.StatusCode = HttpStatusCode.RequestTimeout;
-            }
 
-            response.Headers.Add("X-Correlation-Id", CorrelationId.ToString());            
-            rabbitMQHelper.PushAuditMessage(response.GetJsonBytes());
+            response.Headers.Add("X-Correlation-Id", CorrelationId.ToString());   
+            
+            messageClient.PushAuditMessage(response.GetJsonBytes());
 
             return response;
         }
 
-        public static List<Route> GetRoutes(string path, TransportType transportType, RabbitMQHelper helper = null)
+        public static List<Route> GetRoutes(string path, TransportType transportType, IMessageClient helper = null)
         {
             var routeFiles = GetFiles(path, "*.yml");
 
             return ExtractRoutes(transportType, routeFiles, helper);
         }
 
-        private static List<Route> ExtractRoutes(TransportType transportType, FileInfo[] routeFiles, RabbitMQHelper helper = null)
+        private static List<Route> ExtractRoutes(TransportType transportType, FileInfo[] routeFiles, IMessageClient helper = null)
         {
             var routes = new List<Route>();
 
@@ -151,7 +141,7 @@ namespace Gateway.Routing
                     route.TransportType = transportType;
                     routes.Add(route);
 
-                    // Sets up Rabbit queue if it doesn't exist
+                    // Sets up queue if it doesn't exist
                     if(helper != null)
                     {
                         helper.SetupQueue(route.Destination.MessageQueue);

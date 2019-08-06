@@ -1,10 +1,6 @@
 ﻿using RabbitMQ.Client;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
-namespace Gateway.Queueing
+namespace Gateway.MQ.Rabbit
 {
     public interface IRabbitMQConnectionFactory
     {

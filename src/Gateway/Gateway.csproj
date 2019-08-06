@@ -16,6 +16,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\GatewayMQ\Gateway.MQ.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="Routes\Http\Movies.yml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

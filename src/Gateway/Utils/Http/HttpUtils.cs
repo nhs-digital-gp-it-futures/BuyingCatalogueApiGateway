@@ -1,10 +1,6 @@
 ﻿using RestSharp;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
 using System.Net.Http;
-using System.Threading.Tasks;
 
 namespace Gateway.Utils.Http
 {
@@ -24,13 +20,8 @@ namespace Gateway.Utils.Http
         }
 
         public static Method GetHttpMethod(HttpMethod method)
-        {            
-            return GetHttpMethod(method.ToString());
-        }
-
-        public static int ConvertStatusCode(HttpStatusCode statusCode)
         {
-            return (int)Enum.Parse(typeof(HttpStatusCode), statusCode.ToString());
+            return GetHttpMethod(method.ToString());
         }
     }
 }

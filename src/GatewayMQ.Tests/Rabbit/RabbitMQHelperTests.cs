@@ -1,17 +1,11 @@
 ﻿using FluentAssertions;
-using Gateway.Queueing;
-using Microsoft.Extensions.Options;
-using Moq;
+using Gateway.MQ.Rabbit;
 using RabbitMQ.Client;
-using RabbitMQ.Client.Events;
-using RabbitMQ.Client.Framing;
 using RabbitMQ.Fakes;
-using System;
-using System.Collections.Generic;
 using System.Text;
 using Xunit;
 
-namespace Gateway.Tests.UnitTests.Queueing
+namespace GatewayMQ.Tests.Rabbit
 {
     public class RabbitMQHelperTests
     {

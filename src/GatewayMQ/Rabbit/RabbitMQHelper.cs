@@ -1,16 +1,26 @@
-﻿using RabbitMQ.Client;
+﻿using Gateway.MQ.Common;
+using Gateway.MQ.Interfaces;
+using RabbitMQ.Client;
 
-namespace Gateway.Queueing
+namespace Gateway.MQ.Rabbit
 {
-    public class RabbitMQHelper
+    public class RabbitMQHelper : IMessageClient
     {
         private static IModel _model;
-        private static string _exchangeName;
+        private static string _exchangeName;        
 
-        public RabbitMQHelper(IConnection connection, string exchangeName)
+        public RabbitMQHelper(ConnectionDetails details)
+        {
+            IRabbitMQConnectionFactory factory = new RabbitMQConnection(details);
+            IConnection connection = factory.CreateConnection();
+            _model = connection.CreateModel();
+            _exchangeName = details.ExchangeName;
+        }
+
+        public RabbitMQHelper(IConnection connection, string exchange)
         {
             _model = connection.CreateModel();
-            _exchangeName = exchangeName;
+            _exchangeName = exchange;
         }
 
         public void SetupQueue(string queueName)

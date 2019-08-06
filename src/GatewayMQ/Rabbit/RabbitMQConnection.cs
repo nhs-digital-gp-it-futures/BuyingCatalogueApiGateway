@@ -1,12 +1,13 @@
-﻿using RabbitMQ.Client;
+﻿using Gateway.MQ.Common;
+using RabbitMQ.Client;
 
-namespace Gateway.Queueing
+namespace Gateway.MQ.Rabbit
 {
     public class RabbitMQConnection : IRabbitMQConnectionFactory
     {        
-        private readonly RabbitMQConnectionDetails connection;
+        private readonly ConnectionDetails connection;
         
-        public RabbitMQConnection(RabbitMQConnectionDetails connection)
+        public RabbitMQConnection(ConnectionDetails connection)
         {
             this.connection = connection;
         }
