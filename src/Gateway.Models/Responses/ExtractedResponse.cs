@@ -1,17 +1,12 @@
-﻿using Gateway.Utils.Http;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json;
 using RestSharp;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Text;
-using System.Threading.Tasks;
+using HttpResponse = Microsoft.AspNetCore.Http.HttpResponse;
 
-namespace Gateway.Models
+namespace Gateway.Models.Responses
 {
     public class ExtractedResponse
     {
@@ -19,14 +14,14 @@ namespace Gateway.Models
         public HttpStatusCode StatusCode { get; set; }
         public IHeaderDictionary Headers { get; set; } = new HeaderDictionary();
 
-        public ExtractedResponse(Microsoft.AspNetCore.Http.HttpResponse response)
+        public ExtractedResponse(HttpResponse response)
         {            
             using (var reader = new StreamReader(response.Body))
             {
                 Body = reader.ReadToEnd();
             }
 
-            StatusCode = (HttpStatusCode)response.StatusCode;            
+            StatusCode = (HttpStatusCode)response.StatusCode;
         }
 
         public ExtractedResponse(IRestResponse response)

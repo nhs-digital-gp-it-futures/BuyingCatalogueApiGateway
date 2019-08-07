@@ -2,7 +2,7 @@
 using System;
 using System.Net.Http;
 
-namespace Gateway.Utils.Http
+namespace Gateway.Http
 {
     public static class HttpUtils
     {

@@ -1,7 +1,7 @@
-﻿using Gateway.Routing;
+﻿using Gateway.Models.Requests;
 using RestSharp;
 
-namespace Gateway.Utils.Http
+namespace Gateway.Http
 {
     public static class HttpRequestMessageFactory
     {

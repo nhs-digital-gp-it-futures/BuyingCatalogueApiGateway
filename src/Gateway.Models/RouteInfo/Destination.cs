@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using YamlDotNet.Serialization;
+﻿using YamlDotNet.Serialization;
 
-namespace Gateway.Routing
+namespace Gateway.Models.RouteInfo
 {
     public class Destination
     {

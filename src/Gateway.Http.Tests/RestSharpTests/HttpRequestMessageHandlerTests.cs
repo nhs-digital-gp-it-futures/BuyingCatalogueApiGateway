@@ -1,11 +1,8 @@
 ﻿using FluentAssertions;
-using Gateway.Routing;
-using Gateway.Utils.Http;
+using Gateway.Models.Requests;
+using Gateway.Http;
 using Microsoft.AspNetCore.Http;
 using RestSharp;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using Xunit;
 
 namespace Gateway.Tests.UnitTests.Utils

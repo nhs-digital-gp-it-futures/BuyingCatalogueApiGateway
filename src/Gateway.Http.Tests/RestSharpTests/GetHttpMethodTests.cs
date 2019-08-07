@@ -1,5 +1,5 @@
 ﻿using FluentAssertions;
-using Gateway.Utils.Http;
+using Gateway.Http;
 using RestSharp;
 using System;
 using System.Net.Http;

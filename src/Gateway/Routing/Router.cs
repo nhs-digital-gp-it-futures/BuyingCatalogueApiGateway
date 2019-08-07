@@ -1,10 +1,9 @@
-﻿using Gateway.Models;
-using Gateway.Utils.Http;
-using Gateway.MQ.Common;
+﻿using Gateway.Http.PublicInterfaces;
+using Gateway.Models.Requests;
+using Gateway.Models.Responses;
+using Gateway.Models.RouteInfo;
 using Gateway.MQ.Interfaces;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
-using RestSharp;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -13,7 +12,7 @@ using System.Net;
 using System.Threading.Tasks;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
-using Gateway.MQ.Rabbit;
+using TransportType = Gateway.Models.RouteInfo.TransportType;
 
 namespace Gateway.Routing
 {
@@ -23,11 +22,13 @@ namespace Gateway.Routing
         public IConfiguration Configuration { get; set; }
 
         private readonly IMessageClient messageClient;
+        private readonly IHttpClient httpClient;
         private Guid CorrelationId;
 
-        public Router(IMessageClient messageClient)
+        public Router(IMessageClient messageClient, IHttpClient httpClient)
         {
             this.messageClient = messageClient;
+            this.httpClient = httpClient;
 
             string mqRoutesPath = Path.Combine(Environment.CurrentDirectory, "Routes", "MQ");
             string httpRoutesPath = Path.Combine(Environment.CurrentDirectory, "Routes", "Http");
@@ -42,8 +43,6 @@ namespace Gateway.Routing
 
         public async Task<ExtractedResponse> RouteRequest(ExtractedRequest request)
         {
-            messageClient.PushAuditMessage(request.GetJsonBytes());
-
             CorrelationId = Guid.Parse(request.Headers["X-Correlation-Id"]);
 
             // Organise the path to the final endpoint            
@@ -56,7 +55,7 @@ namespace Gateway.Routing
 
             try
             {
-                route = Endpoints.First(r => r.Endpoint.Equals(basePath)) ?? null;
+                route = Endpoints.First(r => r.Endpoint.Equals(basePath));
             }
             catch
             {
@@ -70,7 +69,7 @@ namespace Gateway.Routing
             }
             else 
             {
-                bool authorized = route.Destination.RequiresAuthentication ? /* Stuff should happen here to authorize peeps*/ false : true ;
+                bool authorized = false;
                 if (route.Destination.RequiresAuthentication)
                 {
                     // Put the auth stuff here
@@ -84,16 +83,7 @@ namespace Gateway.Routing
                 {
                     if (route.TransportType == TransportType.Http)
                     {
-                        var apiUrl = Configuration.GetConnectionString(route.Destination.ApiName);
-
-                        // Does the converting for endpoint routing properly
-                        var endPath = request.Path.Split('/');
-                        endPath[1] = route.Destination.Uri;
-                        request.Path = string.Join('/', endPath);
-
-                        IRestRequest restRequest = HttpRequestMessageFactory.GenerateRequestMessage(request, apiUrl);
-
-                        response = await HttpClientWrapper.SendRequest(restRequest);
+                        response = await httpClient.SendRequest(request, route);
                     }
                     else if (route.TransportType == TransportType.MessageQueue)
                     {
@@ -108,12 +98,15 @@ namespace Gateway.Routing
                         response.StatusCode = HttpStatusCode.BadRequest;
                     }
                 }
+                else
+                {
+                    response.Body = "Unauthorized";
+                    response.StatusCode = HttpStatusCode.Unauthorized;
+                }
             }
 
             response.Headers.Add("X-Correlation-Id", CorrelationId.ToString());   
             
-            messageClient.PushAuditMessage(response.GetJsonBytes());
-
             return response;
         }
 

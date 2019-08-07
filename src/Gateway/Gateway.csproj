@@ -16,6 +16,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Gateway.Http\Gateway.Http.csproj" />
+    <ProjectReference Include="..\Gateway.Models\Gateway.Models.csproj" />
     <ProjectReference Include="..\GatewayMQ\Gateway.MQ.csproj" />
   </ItemGroup>
 

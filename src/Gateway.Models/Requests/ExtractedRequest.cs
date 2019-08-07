@@ -3,7 +3,7 @@ using Newtonsoft.Json;
 using System.IO;
 using System.Text;
 
-namespace Gateway.Routing
+namespace Gateway.Models.Requests
 {
     public class ExtractedRequest
     {

@@ -1,4 +1,4 @@
-﻿namespace Gateway.Routing
+﻿namespace Gateway.Models.RouteInfo
 {
     public enum TransportType
     {

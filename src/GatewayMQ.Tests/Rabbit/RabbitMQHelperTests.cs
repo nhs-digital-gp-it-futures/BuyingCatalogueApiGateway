@@ -5,7 +5,7 @@ using RabbitMQ.Fakes;
 using System.Text;
 using Xunit;
 
-namespace GatewayMQ.Tests.Rabbit
+namespace Gateway.MQ.Tests.Rabbit
 {
     public class RabbitMQHelperTests
     {

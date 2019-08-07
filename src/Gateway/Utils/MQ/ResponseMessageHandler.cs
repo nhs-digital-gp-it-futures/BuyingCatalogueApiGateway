@@ -1,8 +1,5 @@
-﻿using Gateway.Models;
+﻿using Gateway.Models.Responses;
 using Microsoft.AspNetCore.Http;
-using System;
-using System.Net;
-using System.Net.Http;
 
 namespace Gateway.Utils
 {
