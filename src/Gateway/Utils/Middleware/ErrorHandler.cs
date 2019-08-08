@@ -51,7 +51,7 @@ namespace Gateway.Utils.Middleware
             }
 
             response.ContentType = "application/json";
-            response.StatusCode = (int)HttpStatusCode.BadGateway;
+            response.StatusCode = statusCode;
             await response.WriteAsync(JsonConvert.SerializeObject(new {
                 Message = message,
                 Description = description,
