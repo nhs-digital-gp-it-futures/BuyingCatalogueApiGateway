@@ -1,13 +1,13 @@
 ﻿using FluentAssertions;
-using Gateway.Queueing;
+using Gateway.Http.PublicInterfaces;
+using Gateway.Models.Requests;
+using Gateway.Models.RouteInfo;
+using Gateway.MQ.Interfaces;
 using Gateway.Routing;
-using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Http;
 using Moq;
-using RabbitMQ.Client;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using Xunit;
 
 namespace Gateway.Tests.UnitTests.Routing
@@ -20,7 +20,7 @@ namespace Gateway.Tests.UnitTests.Routing
             var routes = Router.GetRoutes(Path.Combine(Environment.CurrentDirectory, "Routes", "MQ"), TransportType.MessageQueue);
 
             routes.Should().AllBeOfType<Route>();
-            foreach(var route in routes)
+            foreach (var route in routes)
             {
                 route.TransportType.Should().Be(TransportType.MessageQueue);
             }
@@ -36,6 +36,27 @@ namespace Gateway.Tests.UnitTests.Routing
             {
                 route.TransportType.Should().Be(TransportType.Http);
             }
+        }
+
+        [Fact]
+        public async void Router_UndefinedRoute()
+        {
+            // Assemble
+            var messageClient = new Mock<IMessageClient>();
+            var httpClient = new Mock<IHttpClient>();
+            var router = new Router(messageClient.Object, httpClient.Object); ;
+            var headers = new HeaderDictionary
+            {
+                { "X-Correlation-Id", Guid.NewGuid().ToString() }
+            };
+            ExtractedRequest request = new ExtractedRequest("/bob", "", "", headers, "GET");
+
+            // Action
+            var response = await router.RouteRequest(request);
+
+            // Assert
+            response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+            response.Body.Should().Be("Unable to locate path");
         }
     }
 }
