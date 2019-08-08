@@ -75,6 +75,7 @@ namespace Gateway
 
             app.UseMiddleware<IgnoreRoute>(ignoredRoutes);
             app.UseMiddleware<AddHeaders>();
+            app.UseErrorHandler();
 
             app.Run(async (context) =>
             {
