@@ -1,6 +1,6 @@
 ﻿namespace Gateway.MQ.Common
 {
-    public class ConnectionDetails
+    public sealed class ConnectionDetails
     {
         public string HostName { get; set; }
         public string ExchangeName { get; set; }

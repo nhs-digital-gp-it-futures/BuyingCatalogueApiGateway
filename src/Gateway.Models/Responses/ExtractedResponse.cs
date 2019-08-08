@@ -8,7 +8,7 @@ using HttpResponse = Microsoft.AspNetCore.Http.HttpResponse;
 
 namespace Gateway.Models.Responses
 {
-    public class ExtractedResponse
+    public sealed class ExtractedResponse
     {
         public string Body { get; set; }
         public HttpStatusCode StatusCode { get; set; }

@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace Gateway.Http
 {
-    public class HttpClientWrapper : IHttpClient
+    public sealed class HttpClientWrapper : IHttpClient
     {
         private readonly Dictionary<string, string> connectionStrings;
         private readonly IRestClient restClient;

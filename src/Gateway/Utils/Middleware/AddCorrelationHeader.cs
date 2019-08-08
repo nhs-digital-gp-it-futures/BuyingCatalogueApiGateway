@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace Gateway.Utils.Middleware
 {
-    public class AddHeaders
+    public sealed class AddHeaders
     {
         private readonly RequestDelegate next;
 

@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Gateway.Models.Requests
 {
-    public class ExtractedRequest
+    public sealed class ExtractedRequest
     {
         public string Body { get; }
         public string Query { get; }

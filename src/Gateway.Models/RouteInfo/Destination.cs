@@ -2,7 +2,7 @@
 
 namespace Gateway.Models.RouteInfo
 {
-    public class Destination
+    public sealed class Destination
     {
         [YamlMember(Alias = "requires-authentication", ApplyNamingConventions = false)]
         public bool RequiresAuthentication { get; set; }

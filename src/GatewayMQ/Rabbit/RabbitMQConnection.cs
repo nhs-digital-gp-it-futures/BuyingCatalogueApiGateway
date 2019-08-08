@@ -3,7 +3,7 @@ using RabbitMQ.Client;
 
 namespace Gateway.MQ.Rabbit
 {
-    public class RabbitMQConnection : IRabbitMQConnectionFactory
+    public sealed class RabbitMQConnection : IRabbitMQConnectionFactory
     {        
         private readonly ConnectionDetails connection;
         

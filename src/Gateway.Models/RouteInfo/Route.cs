@@ -6,7 +6,7 @@
         Http
     }
 
-    public class Route
+    public sealed class Route
     {
         public string Endpoint { get; set; }
         public TransportType TransportType { get; set; }

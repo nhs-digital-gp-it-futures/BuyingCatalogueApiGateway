@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Gateway.Utils.Middleware
 {
-    public class IgnoreRoute
+    public sealed class IgnoreRoute
     {
         private readonly RequestDelegate next;
         private readonly List<string> ignoredRoutes;

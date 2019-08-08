@@ -4,7 +4,7 @@ using RabbitMQ.Client;
 
 namespace Gateway.MQ.Rabbit
 {
-    public class RabbitMQHelper : IMessageClient
+    public sealed class RabbitMQHelper : IMessageClient
     {
         private static IModel _model;
         private static string _exchangeName;        
