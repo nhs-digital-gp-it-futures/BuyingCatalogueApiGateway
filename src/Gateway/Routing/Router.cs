@@ -1,4 +1,5 @@
 ﻿using Gateway.Http.PublicInterfaces;
+using Gateway.Models.Exceptions;
 using Gateway.Models.Requests;
 using Gateway.Models.Responses;
 using Gateway.Models.RouteInfo;
@@ -18,7 +19,7 @@ namespace Gateway.Routing
 {
     public sealed class Router
     {
-        internal List<Route> Endpoints { get; }        
+        internal List<Route> Endpoints { get; }
         public IConfiguration Configuration { get; set; }
 
         private readonly IMessageClient messageClient;
@@ -56,52 +57,27 @@ namespace Gateway.Routing
             }
             catch
             {
-                route = null;
+                throw new NotFoundCustomException("Route not found", $"Route matching {basePath} not found");
             }
 
-            if(route == null)
-            {            
-                response.Body = "Unable to locate path";
-                response.StatusCode = HttpStatusCode.NotFound;                
-            }
-            else 
+            if (route.Destination.RequiresAuthentication)
             {
-                bool authorized = false;
-                if (route.Destination.RequiresAuthentication)
-                {
-                    // Put the auth stuff here
-                }
-                else
-                {
-                    authorized = true;
-                }
-
-                if (authorized)
-                {
-                    if (route.TransportType == TransportType.Http)
-                    {
-                        response = await httpClient.SendRequest(request, route);
-                    }
-                    else if (route.TransportType == TransportType.MessageQueue)
-                    {
-                        messageClient.PushMessageIntoQueue(request.GetJsonBytes(), route.Destination.MessageQueue);
-
-                        response.Body = "{message: \"Message client does not support responses at the moment\"}";
-                        response.StatusCode = HttpStatusCode.OK;
-                    }
-                    else
-                    {
-                        response.Body = "Transport type not supported";
-                        response.StatusCode = HttpStatusCode.BadRequest;
-                    }
-                }
-                else
-                {
-                    response.Body = "Unauthorized";
-                    response.StatusCode = HttpStatusCode.Unauthorized;
-                }
+                // Auth stuff would go here, throwing exception for now
+                throw new NotAuthorizedCustomException("Unauthorized", "You do not have permission to access this resource");
             }
-            
+
+            if (route.TransportType == TransportType.Http)
+            {
+                response = await httpClient.SendRequest(request, route);
+            }
+            else if (route.TransportType == TransportType.MessageQueue)
+            {
+                messageClient.PushMessageIntoQueue(request.GetJsonBytes(), route.Destination.MessageQueue);
+
+                response.Body = "{message: \"Message client does not support responses at the moment\"}";
+                response.StatusCode = HttpStatusCode.OK;
+            }
+
             return response;
         }
 
@@ -130,7 +106,7 @@ namespace Gateway.Routing
                     routes.Add(route);
 
                     // Sets up queue if it doesn't exist
-                    if(helper != null)
+                    if (helper != null)
                     {
                         helper.SetupQueue(route.Destination.MessageQueue);
                     }

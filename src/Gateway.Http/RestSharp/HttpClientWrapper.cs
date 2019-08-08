@@ -1,4 +1,5 @@
 ﻿using Gateway.Http.PublicInterfaces;
+using Gateway.Models.Exceptions;
 using Gateway.Models.Requests;
 using Gateway.Models.Responses;
 using Gateway.Models.RouteInfo;
@@ -21,14 +22,21 @@ namespace Gateway.Http
         }
 
         public async Task<ExtractedResponse> SendRequest(ExtractedRequest request, Route route)
-        {
+        {            
             var apiUrl = connectionStrings[route.Destination.ApiName] ?? throw new ArgumentNullException();
 
-            request.Path = ConvertEndpoint(request.Path, route.Destination.Uri);
+            var originalPath = route.Endpoint;
+
+            request.Path = ConvertEndpoint(originalPath, route.Destination.Uri);
 
             IRestRequest restRequest = HttpRequestMessageFactory.GenerateRequestMessage(request, apiUrl);
 
             var response = await restClient.ExecuteTaskAsync(restRequest);
+
+            if(response.ErrorException != null)
+            {
+                throw new CustomException("Request timed out", $"Request to {originalPath} timed out", (int)System.Net.HttpStatusCode.RequestTimeout);
+            }
 
             return new ExtractedResponse(response);
         }

@@ -1,6 +1,8 @@
 ﻿using FluentAssertions;
 using Gateway.Http.PublicInterfaces;
+using Gateway.Models.Exceptions;
 using Gateway.Models.Requests;
+using Gateway.Models.Responses;
 using Gateway.Models.RouteInfo;
 using Gateway.MQ.Interfaces;
 using Gateway.Routing;
@@ -8,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Moq;
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Gateway.Tests.UnitTests.Routing
@@ -39,7 +42,7 @@ namespace Gateway.Tests.UnitTests.Routing
         }
 
         [Fact]
-        public async void Router_UndefinedRoute()
+        public void Router_UndefinedRoute()
         {
             // Assemble
             var messageClient = new Mock<IMessageClient>();
@@ -51,12 +54,8 @@ namespace Gateway.Tests.UnitTests.Routing
             };
             ExtractedRequest request = new ExtractedRequest("/bob", "", "", headers, "GET");
 
-            // Action
-            var response = await router.RouteRequest(request);
-
-            // Assert
-            response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
-            response.Body.Should().Be("Unable to locate path");
+            Func<Task> act = async () => await router.RouteRequest(request);
+            act.Should().Throw<NotFoundCustomException>("Route not found");
         }
     }
 }
