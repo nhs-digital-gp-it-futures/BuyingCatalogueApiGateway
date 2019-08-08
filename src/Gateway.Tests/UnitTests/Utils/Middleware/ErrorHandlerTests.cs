@@ -114,5 +114,17 @@ namespace Gateway.Tests.UnitTests.Utils.Middleware
             context.Response.StatusCode.Should().Be(202);
         }
 
+        [Fact]
+        public async void ErrorHandler_NoError()
+        {
+            var errorHandler = new ErrorHandler((innerHttpContext) => Task.FromResult(0));
+
+            var context = new DefaultHttpContext();
+            context.Response.Body = new MemoryStream();
+
+            await errorHandler.Invoke(context);
+
+            context.Response.StatusCode.Should().Be(200);
+        }
     }
 }
