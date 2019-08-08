@@ -23,7 +23,6 @@ namespace Gateway.Routing
 
         private readonly IMessageClient messageClient;
         private readonly IHttpClient httpClient;
-        private Guid CorrelationId;
 
         public Router(IMessageClient messageClient, IHttpClient httpClient)
         {
@@ -43,8 +42,6 @@ namespace Gateway.Routing
 
         public async Task<ExtractedResponse> RouteRequest(ExtractedRequest request)
         {
-            CorrelationId = Guid.Parse(request.Headers["X-Correlation-Id"]);
-
             // Organise the path to the final endpoint            
             string basePath = '/' + request.Path.Split('/')[1];
 
@@ -104,8 +101,6 @@ namespace Gateway.Routing
                     response.StatusCode = HttpStatusCode.Unauthorized;
                 }
             }
-
-            response.Headers.Add("X-Correlation-Id", CorrelationId.ToString());   
             
             return response;
         }

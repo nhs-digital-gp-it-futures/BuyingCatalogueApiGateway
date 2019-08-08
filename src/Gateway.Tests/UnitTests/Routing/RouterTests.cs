@@ -51,13 +51,12 @@ namespace Gateway.Tests.UnitTests.Routing
             };
             ExtractedRequest request = new ExtractedRequest("/bob", "", "", headers, "GET");
 
-            //Action
+            // Action
             var response = await router.RouteRequest(request);
 
             // Assert
             response.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
             response.Body.Should().Be("Unable to locate path");
-            response.Headers.Should().ContainKey("X-Correlation-Id").And.ContainValue(headers["X-Correlation-Id"]);
         }
     }
 }
