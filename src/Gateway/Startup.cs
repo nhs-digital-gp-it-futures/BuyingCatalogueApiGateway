@@ -73,9 +73,9 @@ namespace Gateway
                 "favicon.ico"
             };
 
-            app.UseMiddleware<IgnoreRoute>(ignoredRoutes);
-            app.UseMiddleware<AddHeaders>();
             app.UseErrorHandler();
+            app.UseMiddleware<IgnoreRoute>(ignoredRoutes);
+            app.UseMiddleware<AddHeaders>();            
 
             app.Run(async (context) =>
             {
