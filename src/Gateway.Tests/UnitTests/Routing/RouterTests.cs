@@ -2,7 +2,6 @@
 using Gateway.Http.PublicInterfaces;
 using Gateway.Models.Exceptions;
 using Gateway.Models.Requests;
-using Gateway.Models.Responses;
 using Gateway.Models.RouteInfo;
 using Gateway.MQ.Interfaces;
 using Gateway.Routing;
@@ -46,8 +45,8 @@ namespace Gateway.Tests.UnitTests.Routing
         {
             // Assemble
             var messageClient = new Mock<IMessageClient>();
-            var httpClient = new Mock<IHttpClient>();
-            var router = new Router(messageClient.Object, httpClient.Object); ;
+            var httpClient = new Mock<IHttpClient>();            
+            var router = new Router(messageClient.Object, httpClient.Object);
             var headers = new HeaderDictionary
             {
                 { "X-Correlation-Id", Guid.NewGuid().ToString() }

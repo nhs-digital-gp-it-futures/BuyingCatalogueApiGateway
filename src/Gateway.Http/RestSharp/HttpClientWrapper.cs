@@ -21,13 +21,19 @@ namespace Gateway.Http
             restClient = new RestClient();
         }
 
+        public HttpClientWrapper(Dictionary<string, string> connectionStrings, IRestClient client)
+        {
+            this.connectionStrings = connectionStrings;
+            restClient = client;
+        }
+
         public async Task<ExtractedResponse> SendRequest(ExtractedRequest request, Route route)
         {            
             var apiUrl = connectionStrings[route.Destination.ApiName] ?? throw new ArgumentNullException();
 
-            var originalPath = route.Endpoint;
+            var originalPath = request.Path;
 
-            request.Path = ConvertEndpoint(originalPath, route.Destination.Uri);
+            request.Path = ConvertEndpoint(originalPath, route);
 
             IRestRequest restRequest = HttpRequestMessageFactory.GenerateRequestMessage(request, apiUrl);
 
@@ -41,11 +47,9 @@ namespace Gateway.Http
             return new ExtractedResponse(response);
         }
 
-        private string ConvertEndpoint(string originalPath, string apiEndpoint)
+        private string ConvertEndpoint(string originalPath, Route route)
         {
-            var splitPath = originalPath.Split('/');
-            splitPath[1] = apiEndpoint;
-            return string.Join('/', splitPath);
+            return originalPath.Replace(route.Endpoint, route.Destination.Uri);
         }
     }
 }
