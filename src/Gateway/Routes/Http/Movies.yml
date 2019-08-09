@@ -1,4 +1,4 @@
 ﻿endpoint: /films
 destination:
-    uri: "movies"
+    uri: "/movies"
     api-name: NodeApi
