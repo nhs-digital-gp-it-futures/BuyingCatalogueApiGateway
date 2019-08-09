@@ -1,16 +1,20 @@
-﻿using Gateway.Queueing;
+﻿using Gateway.Http;
+using Gateway.Http.PublicInterfaces;
+using Gateway.Models.Requests;
+using Gateway.MQ.Common;
+using Gateway.MQ.Interfaces;
+using Gateway.MQ.Rabbit;
 using Gateway.Routing;
+using Gateway.Utils.Middleware;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
-using RabbitMQ.Client;
-using System;
+using Microsoft.Extensions.Options;
+using System.Collections.Generic;
 using System.IO;
-using System.Net;
 
 namespace Gateway
 {
@@ -19,7 +23,7 @@ namespace Gateway
         public Startup(IHostingEnvironment env)
         {
             var builder = new ConfigurationBuilder()
-                .SetBasePath(env.ContentRootPath)
+                .SetBasePath(Directory.GetCurrentDirectory())
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                 .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true);
             builder.AddEnvironmentVariables();
@@ -32,41 +36,57 @@ namespace Gateway
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+
+            services.AddOptions();
+
+            var mqSection = Configuration.GetSection("MessageQueueSettings").Get<ConnectionDetails>();
+            services.AddSingleton(MQConnectionFactory.GetMessageClient(mqSection));
+
+            var connStrings = Configuration.GetSection("ConnectionStrings").GetChildren();
+            var dictionary = new Dictionary<string, string>();
+            foreach(var cs in connStrings)
+            {
+                dictionary.Add(cs.Key, cs.Value);
+            }
+
+            services.AddSingleton<IHttpClient>(new HttpClientWrapper(dictionary));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env, IMessageClient messageClient, IHttpClient httpClient)
         {
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
             }
 
-            RabbitMQConnection connection = new RabbitMQConnection(Configuration.GetConnectionString("MQserver"));
-            IConnection channel = connection.CreateConnection();
-            IModel rabbitModel = channel.CreateModel();
-            RabbitMQHelper helper = new RabbitMQHelper(rabbitModel);
+            Router router = new Router(messageClient, httpClient)
+            {
+                // Configuration included to help with HTTP API calls
+                Configuration = Configuration
+            };
 
-            helper.SetupQueue("audit");
 
-            Router router = new Router(Configuration, rabbitModel);
+            // Ignore requests to specified endpoints
+            var ignoredRoutes = new List<string>()
+            {
+                "favicon.ico"
+            };
+
+            app.UseErrorHandler();
+            app.UseMiddleware<IgnoreRoute>(ignoredRoutes);
+            app.UseMiddleware<AddHeaders>();            
+
             app.Run(async (context) =>
             {
-                SendMessage sendMessage = new SendMessage(rabbitModel);
-                var correlationId = Guid.NewGuid();
-                context.Request.Headers.Add("X-Correlation-Id", correlationId.ToString());
                 var extractedRequest = new ExtractedRequest(context.Request);
-
-                sendMessage.SendCall(JsonConvert.SerializeObject(extractedRequest), "audit", correlationId);
+                messageClient.PushAuditMessage(extractedRequest.GetJsonBytes());
 
                 var content = await router.RouteRequest(extractedRequest);
-                context.Response.Headers.Add("X-Correlation-Id", correlationId.ToString());
-                context.Response.ContentType = "application/json";
-                context.Response.StatusCode = (int)Enum.Parse(typeof(HttpStatusCode), content.StatusCode.ToString());
+                context.Response.StatusCode = (int)content.StatusCode;
                 content.Headers = context.Response.Headers;
 
-                sendMessage.SendCall(JsonConvert.SerializeObject(content), "audit", correlationId);
-
+                messageClient.PushAuditMessage(content.GetJsonBytes());
                 await context.Response.WriteAsync(content.Body);
             });
         }
