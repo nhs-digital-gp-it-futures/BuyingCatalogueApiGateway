@@ -6,7 +6,6 @@ using Gateway.Models.RouteInfo;
 using RestSharp;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Threading.Tasks;
 
 namespace Gateway.Http
@@ -20,6 +19,12 @@ namespace Gateway.Http
         {
             this.connectionStrings = connectionStrings;
             restClient = new RestClient();
+        }
+
+        public HttpClientWrapper(Dictionary<string, string> connectionStrings, IRestClient client)
+        {
+            this.connectionStrings = connectionStrings;
+            restClient = client;
         }
 
         public async Task<ExtractedResponse> SendRequest(ExtractedRequest request, Route route)
